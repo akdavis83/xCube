@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Glowing Rotating Cube with Sphere</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            overflow: hidden;
+            font-family: 'Arial', sans-serif;
+        }
+        
+        #container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #87ceeb;
+            font-size: 18px;
+            text-shadow: 0 0 10px rgba(135, 206, 235, 0.5);
+            z-index: 100;
+        }
+        
+        #title {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #87ceeb;
+            font-size: 3em;
+            font-weight: bold;
+            text-align: center;
+            text-shadow: 0 0 20px rgba(135, 206, 235, 0.8);
+            z-index: 50;
+            pointer-events: none;
+            opacity: 0.8;
+        }
+        
+        canvas {
+            display: block;
+        }
+        
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #87ceeb;
+            font-size: 24px;
+            z-index: 200;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="loading">Loading Three.js Scene...</div>
+        <div id="info" style="display: none;">
+            Light Blue Rotating Cube with Bloom Effect<br>
+            Counter-rotating Sphere Inside
+        </div>
+        <div id="title" style="display: none;">ETHEREAL GEOMETRY</div>
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+        // Hide loading message and show UI
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('info').style.display = 'block';
+        document.getElementById('title').style.display = 'block';
+
+        // Scene setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0x000000, 0);
+        renderer.toneMapping = THREE.ReinhardToneMapping;
+        renderer.toneMappingExposure = 1;
+        document.getElementById('container').appendChild(renderer.domElement);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
+        scene.add(ambientLight);
+
+        const pointLight1 = new THREE.PointLight(0x87ceeb, 2, 100);
+        pointLight1.position.set(10, 10, 10);
+        scene.add(pointLight1);
+
+        const pointLight2 = new THREE.PointLight(0x87ceeb, 1.5, 100);
+        pointLight2.position.set(-10, -10, -10);
+        scene.add(pointLight2);
+
+        // Create light blue glowing material for cube
+        const cubeMaterial = new THREE.MeshPhongMaterial({
+            color: 0x87ceeb,
+            emissive: 0x4682b4,
+            emissiveIntensity: 0.2,
+            transparent: true,
+            opacity: 0.7,
+            shininess: 100
+        });
+
+        // Create cube geometry and mesh
+        const cubeGeometry = new THREE.BoxGeometry(3, 3, 3);
+        const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+        scene.add(cube);
+
+        // Create wireframe for cube edges
+        const cubeEdges = new THREE.EdgesGeometry(cubeGeometry);
+        const cubeWireframeMaterial = new THREE.LineBasicMaterial({
+            color: 0x87ceeb,
+            transparent: true,
+            opacity: 0.8
+        });
+        const cubeLines = new THREE.LineSegments(cubeEdges, cubeWireframeMaterial);
+        scene.add(cubeLines);
+
+        // Create light blue glowing material for sphere
+        const sphereMaterial = new THREE.MeshPhongMaterial({
+            color: 0x87ceeb,
+            emissive: 0x4682b4,
+            emissiveIntensity: 0.3,
+            transparent: true,
+            opacity: 0.9,
+            shininess: 100
+        });
+
+        // Create sphere geometry and mesh
+        const sphereGeometry = new THREE.SphereGeometry(0.8, 32, 32);
+        const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+        scene.add(sphere);
+
+        // Add some particle effects
+        const particleGeometry = new THREE.BufferGeometry();
+        const particleCount = 300;
+        const positions = new Float32Array(particleCount * 3);
+
+        for (let i = 0; i < particleCount * 3; i++) {
+            positions[i] = (Math.random() - 0.5) * 25;
+        }
+
+        particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+        const particleMaterial = new THREE.PointsMaterial({
+            color: 0x87ceeb,
+            size: 0.1,
+            transparent: true,
+            opacity: 0.6,
+            blending: THREE.AdditiveBlending
+        });
+
+        const particles = new THREE.Points(particleGeometry, particleMaterial);
+        scene.add(particles);
+
+        // Post-processing for bloom effect
+        const composer = new EffectComposer(renderer);
+        const renderPass = new RenderPass(scene, camera);
+        composer.addPass(renderPass);
+
+        const bloomPass = new UnrealBloomPass(
+            new THREE.Vector2(window.innerWidth, window.innerHeight),
+            1.5,  // strength
+            0.4,  // radius
+            0.85  // threshold
+        );
+        composer.addPass(bloomPass);
+
+        const outputPass = new OutputPass();
+        composer.addPass(outputPass);
+
+        // Position camera
+        camera.position.set(0, 2, 8);
+        camera.lookAt(0, 0, 0);
+
+        // Animation variables
+        let time = 0;
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            time += 0.01;
+
+            // Rotate cube clockwise
+            cube.rotation.x += 0.008;
+            cube.rotation.y += 0.012;
+            cube.rotation.z += 0.005;
+
+            // Rotate wireframe with cube
+            cubeLines.rotation.copy(cube.rotation);
+
+            // Rotate sphere counter-clockwise (opposite direction)
+            sphere.rotation.x -= 0.015;
+            sphere.rotation.y -= 0.018;
+            sphere.rotation.z -= 0.010;
+
+            // Animate sphere position slightly within cube
+            sphere.position.x = Math.sin(time * 2) * 0.4;
+            sphere.position.y = Math.cos(time * 1.5) * 0.4;
+            sphere.position.z = Math.sin(time * 1.8) * 0.4;
+
+            // Animate particles
+            particles.rotation.y += 0.002;
+            particles.rotation.x += 0.001;
+
+            // Animate camera for dynamic view
+            camera.position.x = Math.sin(time * 0.5) * 2;
+            camera.position.z = 8 + Math.cos(time * 0.3) * 1;
+            camera.lookAt(0, 0, 0);
+
+            // Animate light intensity
+            pointLight1.intensity = 2 + Math.sin(time * 3) * 0.5;
+            pointLight2.intensity = 1.5 + Math.cos(time * 2.5) * 0.3;
+
+            // Render with bloom
+            composer.render();
+        }
+
+        // Handle window resize
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        window.addEventListener('resize', onWindowResize);
+
+        // Start animation
+        animate();
+
+        // Add some interactivity
+        let mouseX = 0;
+        let mouseY = 0;
+
+        document.addEventListener('mousemove', (event) => {
+            mouseX = (event.clientX / window.innerWidth) * 2 - 1;
+            mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            // Subtle camera movement based on mouse
+            camera.position.x += (mouseX * 3 - camera.position.x) * 0.05;
+            camera.position.y += (mouseY * 3 - camera.position.y) * 0.05;
+        });
+
+        // Add click interaction
+        document.addEventListener('click', () => {
+            // Pulse effect on click
+            bloomPass.strength = 3;
+            setTimeout(() => {
+                bloomPass.strength = 1.5;
+            }, 300);
+        });
+
+        console.log('Three.js scene loaded successfully!');
+    </script>
+</body>
+</html>
